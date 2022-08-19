@@ -3,7 +3,9 @@
 ## Compilation
 
 https://github.com/LeaVandamme/index_kmer_to_reads.git
+
 git submodule init
+
 git submodule update
 
 make -j
