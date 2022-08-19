@@ -2,7 +2,7 @@
 
 ## Compilation
 
-https://github.com/LeaVandamme/index_kmer_to_reads.git
+git clone https://github.com/LeaVandamme/index_kmer_to_reads.git
 
 git submodule init
 
