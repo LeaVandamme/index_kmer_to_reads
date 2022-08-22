@@ -4,3 +4,6 @@
 [submodule "SIMDCompressionAndIntersection"]
 	path = SIMDCompressionAndIntersection
 	url = https://github.com/lemire/SIMDCompressionAndIntersection.git
+[submodule "TurboPFor-Integer-Compression"]
+	path = TurboPFor-Integer-Compression
+	url = https://github.com/powturbo/TurboPFor-Integer-Compression.git
