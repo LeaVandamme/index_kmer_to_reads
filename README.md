@@ -2,13 +2,13 @@
 
 ## Compilation
 
-git clone https://github.com/LeaVandamme/index_kmer_to_reads.git
+git clone --recurse-submodules https://github.com/LeaVandamme/index_kmer_to_reads.git
 
-git submodule init
+cd SIMDCompressionAndIntersection/ ; make
 
-git submodule update
+cd .. ; cd TurboPFor-Integer-Compression/ ; make
 
-make -j
+cd .. ; make -j
 
 ## Launch 
 
