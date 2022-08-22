@@ -1,3 +1,6 @@
 [submodule "BitMagic"]
 	path = BitMagic
 	url = https://github.com/tlk00/BitMagic.git
+[submodule "SIMDCompressionAndIntersection"]
+	path = SIMDCompressionAndIntersection
+	url = https://github.com/lemire/SIMDCompressionAndIntersection.git
