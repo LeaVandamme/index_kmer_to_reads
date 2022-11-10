@@ -90,33 +90,33 @@ void delta_decoding(const vector<uint32_t> reads){
 
 
 
-void vector_compression(rh_umap& index){
-  IntegerCODEC &codec = *CODECFactory::getFromName("s4-bp128-d4");
-  for (auto &pair: index) {
-    if(pair.second->size() > 5 or true){
-       int N = index[pair.first]->size();
-        vector<uint32_t> compressed_output=vector<uint32_t>(N+8);
-        size_t compressedsize = compressed_output.size();
-        codec.encodeArray((uint32_t *) pair.second->data(), N, compressed_output.data(), compressedsize);
-        delete(index[pair.first]);
-        compressed_output.resize(compressedsize);
-        index[pair.first]  = new vector<uint32_t>;
-        for(uint i(0);i<compressedsize;++i){
-          (index[pair.first] )->push_back(compressed_output[i]);
-        }
-          vector<uint32_t> mydataback(N);
-          size_t recoveredsize = mydataback.size();
-          //
-          codec.decodeArray(compressed_output.data(), compressedsize,
-                            mydataback.data(), recoveredsize);
-            if (mydataback != *pair.second)
-              throw runtime_error("bug!"); 
-         //*light_vector=compressed_output;
-         cout << static_cast<double>(compressed_output.size()) << " " << static_cast<double>(pair.second->size()) << endl;
-         cout<<N<<" "<<index[pair.first] ->size()<<" "<<index[pair.first] ->capacity()<<endl;
-    }
-  }
-}
+// void vector_compression(rh_umap& index){
+//   IntegerCODEC &codec = *CODECFactory::getFromName("s4-bp128-d4");
+//   for (auto &pair: index) {
+//     if(pair.second->size() > 5 or true){
+//        int N = index[pair.first]->size();
+//         vector<uint32_t> compressed_output=vector<uint32_t>(N+8);
+//         size_t compressedsize = compressed_output.size();
+//         codec.encodeArray((uint32_t *) pair.second->data(), N, compressed_output.data(), compressedsize);
+//         delete(index[pair.first]);
+//         compressed_output.resize(compressedsize);
+//         index[pair.first]  = new vector<uint32_t>;
+//         for(uint i(0);i<compressedsize;++i){
+//           (index[pair.first] )->push_back(compressed_output[i]);
+//         }
+//           vector<uint32_t> mydataback(N);
+//           size_t recoveredsize = mydataback.size();
+//           //
+//           codec.decodeArray(compressed_output.data(), compressedsize,
+//                             mydataback.data(), recoveredsize);
+//             if (mydataback != *pair.second)
+//               throw runtime_error("bug!"); 
+//          //*light_vector=compressed_output;
+//          cout << static_cast<double>(compressed_output.size()) << " " << static_cast<double>(pair.second->size()) << endl;
+//          cout<<N<<" "<<index[pair.first] ->size()<<" "<<index[pair.first] ->capacity()<<endl;
+//     }
+//   }
+// }
 
 
 

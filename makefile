@@ -1,6 +1,6 @@
 CC = g++
 
-CFLAGS= -O3 -march=native -std=c++17 -Wall
+CFLAGS= -O3 -march=native -std=c++17 -Wall -g
 LDFLAGS = -LSIMDCompressionAndIntersection -l:libSIMDCompressionAndIntersection.a -LTurboPFor-Integer-Compression -l:libic.a -pthread -lpthread
 
 EXEC = index

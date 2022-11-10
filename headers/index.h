@@ -48,9 +48,9 @@ class Index{
 
         vector<uint32_t> index_fasta_rankselect(const string& read_file, uint16_t k, uint16_t bitvector_size);
         vector<uint8_t> index_fasta_rankselect_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size);
-        vect_occ_read query_sequence_rankselect(const vector<uint32_t>* index, const string& sequence);
-        vector<uint32_t> query_kmer_rankselect(const vector<uint32_t>* index_vect, const string& kmer);
-        vect_occ_read query_fasta_rankselect(const vector<uint32_t>* index_vect, const string& filename);
+        vect_occ_read query_sequence_rankselect(const vector<uint8_t>& index, const string& sequence);
+        vector<uint32_t> query_kmer_rankselect(const vector<uint8_t>& index_vect, const string& kmer);
+        vect_occ_read query_fasta_rankselect(const vector<uint8_t>& index_vect, const string& filename);
         void write_index_rankselect(const vector<uint32_t>& read_vector, const string& output_file);
         uint32_t uniqueKmers();
 };
