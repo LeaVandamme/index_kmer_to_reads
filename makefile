@@ -11,13 +11,13 @@ all : $(EXEC)
 index : $(OBJ)
 	$(CC) -o index $^ $(LDFLAGS)
 
-index.o: sources/index.cpp
+index.o: sources/index.cpp headers/index.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 main.o: sources/main.cpp
 	$(CC) -o $@ -c $< $(CFLAGS)
 
-utils.o: sources/utils.cpp
+utils.o: sources/utils.cpp headers/utils.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 fastDelta.o: include/fastDelta.c

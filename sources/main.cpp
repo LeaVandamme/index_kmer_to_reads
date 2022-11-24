@@ -36,20 +36,19 @@ int main(int argc, char *argv[])
         Index index = Index(filename, k);
 
         auto start_indexing = high_resolution_clock::now();
-        
-        vector<uint8_t> read_vector = index.index_fasta_rankselect_compressed(filename, k, bitvector_size);
-        
+                
+        index.index_fasta_rankselect_compressed(filename, k, bitvector_size);
 
         auto end_indexing = high_resolution_clock::now();
         auto indexing = duration_cast<seconds>(end_indexing - start_indexing);
-        double pct_unique_kmers = (double)index.uniqueKmers()/index.get_nb_kmers()*100;
+        double pct_unique_kmers = (double)index.uniqueKmers()/index.nb_kmers*100;
 
         cout << "\n";
         cout << "Indexing takes " << indexing.count() << " seconds." << endl;
-        cout << "K-mer indexed : " << intToString(index.get_nb_kmers()) << " | " << "Unique k-mers : " << pct_unique_kmers << "%" << endl;
+        cout << "K-mer indexed : " << intToString(index.nb_kmers) << " | " << "Unique k-mers : " << pct_unique_kmers << "%" << endl;
         uint64_t memory_used_index = getMemorySelfMaxUsed();
         cout << "Resource usage (indexing) : " << intToString(memory_used_index) << " Ko" << endl;
-        cout << "Resource usage (for 1 k-mer) : " << koToBit((double)memory_used_index/index.get_nb_kmers()) << " Bits" << endl;
+        cout << "Resource usage (for 1 k-mer) : " << koToBit((double)memory_used_index/index.nb_kmers) << " Bits" << endl;
 
         int opt;
 
@@ -62,9 +61,8 @@ int main(int argc, char *argv[])
 
                         // QUERYING KMER
                     string kmer_to_search = seq_from_fasta(optarg);
-
                     auto start_querying_kmer = high_resolution_clock::now();
-                    vector<uint32_t> res_query_kmer = index.query_kmer_rankselect(read_vector, kmer_to_search);
+                    vector<uint32_t> res_query_kmer = index.query_kmer_rankselect(kmer_to_search);
                     if(res_query_kmer.empty()){
                         cout << "The index does not contain this k-mer.";
                     }
@@ -79,7 +77,7 @@ int main(int argc, char *argv[])
                     // QUERYING SEQUENCE
                     string seq = seq_from_fasta(optarg);
                     auto start_querying_seq = high_resolution_clock::now();
-                    index.query_sequence_rankselect(read_vector, seq);
+                    index.query_sequence_rankselect(seq);
                     auto end_querying_seq = high_resolution_clock::now();
                     auto querying_seq = duration_cast<seconds>(end_querying_seq - start_querying_seq);
                     cout << "Querying the sequence takes " << querying_seq.count() << " seconds." << endl;
@@ -91,7 +89,7 @@ int main(int argc, char *argv[])
 
                     // QUERYING FASTA
                     auto start_querying_fasta = high_resolution_clock::now();
-                    index.query_fasta_rankselect(read_vector, optarg);
+                    index.query_fasta_rankselect(optarg);
                     auto end_querying_fasta = high_resolution_clock::now();
                     auto querying_fasta = duration_cast<seconds>(end_querying_fasta - start_querying_fasta);
                     cout << "Querying the Fasta file takes " << querying_fasta.count() << " seconds." << endl;
