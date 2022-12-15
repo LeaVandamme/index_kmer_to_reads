@@ -54,11 +54,21 @@ class Index{
         void set_rs_idx(bvector_rankselect* rs_idx);
         void set_vect_pos(vector<uint32_t>& vect_pos);
 
-        void index_fasta_rankselect_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size);
-        vect_occ_read query_sequence_rankselect(const string& sequence) const;
-        vector<uint32_t> query_kmer_rankselect(const string& kmer) const;
-        vect_occ_read query_fasta_rankselect(const string& filename) const;
+        void index_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size);
+        vector<uint32_t> query_kmer(const string& kmer) const;
+        vect_occ_read query_sequence(const string& sequence) const;
+        void query_sequence_fp(const string& sequence, const string& file_out, uint16_t threshold);
+        vect_occ_read query_fasta(const string& filename) const;
         uint32_t uniqueKmers();
+
+        vector<uint32_t> kmers_array(const string& sequence);
+        unordered_map<uint32_t, uint16_t> get_possible_reads_threshold(const string& sequence, uint threshold);
+        void get_reads(const string& read_file_out, const vector<uint32_t>& id_reads);
+        bool textual_verif(const string& kmer, const string& read);
+        vector<uint32_t> verif_fp(const unordered_map<uint32_t, uint16_t>& reads_to_verify, const vector<uint32_t>& kmers, uint16_t threshold);
+
+        void memory_file(const string& output_file, uint16_t k, uint16_t bv_size);
+
 };
 
 #endif

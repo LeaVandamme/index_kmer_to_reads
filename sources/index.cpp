@@ -8,19 +8,21 @@
 #include <math.h>
 #include <thread>
 #include <unistd.h>
+#include <bits/stdc++.h>
 #include "../BitMagic/src/bm.h"
 #include "../BitMagic/src/bmundef.h"
 #include "../BitMagic/src/bmsparsevec.h"
 #include "../headers/utils.h"
 #include "../include/robin_hood.h"
 #include "../TurboPFor-Integer-Compression/vp4.h"
+//#include "../include/unordered_dense.h"
+
 
 
 using namespace std;
 using namespace chrono;
 
 using std::find;
-
 
 
 Index::Index(string& fastaFilename, uint16_t kmerLength){
@@ -31,34 +33,35 @@ Index::Index(string& fastaFilename, uint16_t kmerLength){
 void Index::set_nb_kmers(uint32_t nb_kmers){
     this-> nb_kmers = nb_kmers;
 }
-
 void Index::set_compressed_index(vector<uint8_t>& compressed_index){
     this-> compressed_index = compressed_index;
 }
-
 void Index::set_counting_bf(sparse_vector_u32* counting_bf){
     this-> counting_bf = counting_bf;
 }
-
 void Index::set_bf(bm::bvector<>& bf){
     this-> bf = bf;
 }
-
 void Index::set_rs_idx(bvector_rankselect* rs_idx){
     this-> rs_idx = rs_idx;
 }
-
 void Index::set_vect_pos(vector<uint32_t>& vect_pos){
     this-> vect_pos = vect_pos;
 }
 
 
-void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size){
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CREATION
+
+
+
+void Index::index_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size){
     bm::bvector<> bitvector;
     bm::bvector<>::rs_index_type* rs_idx(new bm::bvector<>::rs_index_type());
 
     vector<uint32_t> vect_pos = {0};
-    sparse_vector_u32* occ_of_kmer = new sparse_vector_u32;
+    sparse_vector_u32* occ_of_kmer = new sparse_vector_u32; // Calculer sa taille en bits
     bitvector.resize(pow(2,bitvector_size));
     occ_of_kmer->resize(pow(2,bitvector_size));
     uint32_t bvsize = bitvector.size();
@@ -66,9 +69,12 @@ void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t 
     uint32_t num_kmers = 1;
     uint32_t kmer_int, revComp_int, kmer_hash, revComp_hash;
     auto start_bitvector = high_resolution_clock::now();
+    auto start_total = high_resolution_clock::now();
     using value_type = bm::sparse_vector<int, bm::bvector<> >::value_type;
     ifstream fichier(read_file, ios::in);
     if(fichier){
+
+        vector<uint32_t> tmp_vect_kmers;
 
         // BLOOM FILTER
         
@@ -92,17 +98,22 @@ void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t 
                         revComp_int = shiftnucl_revcomp(revComp_int, ligne[i], k);
                         kmer_hash = find_canonical(kmer_int, revComp_int, bvsize);
                         i++;            
-
                         bitvector.set(kmer_hash);
                         num_kmers++;
                     }
-                    occ_of_kmer->inc(kmer_hash);
-                }
+
+                    // IF KMER NOT ALREADY SEEN FOR THIS READ
+                    if (find(tmp_vect_kmers.begin(), tmp_vect_kmers.end(), kmer_int) == tmp_vect_kmers.end()) {
+                        occ_of_kmer->inc(kmer_hash);
+                        tmp_vect_kmers.push_back(kmer_int);
+                    }
+                }   
             }
+            tmp_vect_kmers.clear();
         }
         set_nb_kmers(num_kmers);
-
         bitvector.build_rs_index(rs_idx);
+        vector<uint32_t>().swap(tmp_vect_kmers);
     }
     else{
         cerr << "Error opening the file." << endl;
@@ -133,6 +144,7 @@ void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t 
     uint32_t num_read_index = 0;
     ifstream fichier_index(read_file, ios::in);
     if(fichier_index){
+        vector<uint32_t> tmp_vect_kmers;
         string ligne_index, kmer_index;
             while(!fichier_index.eof()){
                 bool is_first = true;
@@ -154,24 +166,29 @@ void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t 
                             kmer_hash = find_canonical(kmer_int, revComp_int, bvsize);
                             i++;
                         }
-                        auto rank_hash = bitvector.rank(kmer_hash, *rs_idx);
-                        uint32_t start_pos = vect_pos[rank_hash-1];
-                        uint32_t nb_apparition = vect_pos[rank_hash] - vect_pos[rank_hash-1];
+                        if (find(tmp_vect_kmers.begin(), tmp_vect_kmers.end(), kmer_int) == tmp_vect_kmers.end()) {
+                            auto rank_hash = bitvector.rank(kmer_hash, *rs_idx);
+                            uint32_t start_pos = vect_pos[rank_hash-1];
+                            uint32_t nb_apparition = vect_pos[rank_hash] - vect_pos[rank_hash-1];
 
-                        (read_ids)[start_pos]++;
+                            (read_ids)[start_pos]++;
 
-                        uint32_t indice_to_insert = start_pos + (read_ids)[start_pos];
-                        if(indice_to_insert < (start_pos + nb_apparition)){
-                            (read_ids)[indice_to_insert] = num_read_index;
+                            uint32_t indice_to_insert = start_pos + (read_ids)[start_pos];
+                            if(indice_to_insert < (start_pos + nb_apparition)){
+                                (read_ids)[indice_to_insert] = num_read_index;
+                            }
+                            else{
+                                (read_ids)[start_pos] = num_read_index;
+                            }
+
+                            tmp_vect_kmers.push_back(kmer_int);
                         }
-                        else{
-                            (read_ids)[start_pos] = num_read_index;
-                        }
-                    } 
-
+                    }
                     num_read_index ++;
                 }
+            tmp_vect_kmers.clear();
         }
+        vector<uint32_t>().swap(tmp_vect_kmers);
     }
     fichier_index.close();
     cout << "ok index non compressé" << endl;
@@ -208,26 +225,37 @@ void Index::index_fasta_rankselect_compressed(const string& read_file, uint16_t 
     cout << "ok index compressé" << endl;
 
     auto end_index = high_resolution_clock::now();
+    auto end_total = high_resolution_clock::now();
     auto querying_index = duration_cast<std::chrono::seconds>(end_index - start_index);
+    auto total = duration_cast<std::chrono::seconds>(end_total - start_total);
     cout << "ok index : " << querying_index.count() << " seconds."  << endl;
+    cout << "Total time : " << total.count() << " seconds."  << endl;
     bm::bvector<>::statistics st;
     bitvector.calc_stat(&st);
     cout << "Taille du Bloom filter : " << st.memory_used << endl;
     cout << "Taille du vecteur positions : " << vect_pos.size() * 4 <<endl;
-    cout << "Taille du vecteur identifiants : " << compressed_id.size() << endl;
+    cout << "Taille du vecteur identifiants non compressé : " << read_ids.size() * 4<< endl;
+    cout << "Taille du vecteur identifiants compressé : " << compressed_id.size() << endl;
 
     this->set_counting_bf(occ_of_kmer);
     this->set_compressed_index(compressed_id);
     this->set_vect_pos(vect_pos);
     this->set_rs_idx(rs_idx);
     this->set_bf(bitvector);
+
+    memory_file("input_files/test_out_memory.txt", k, bitvector_size);
 }
 
 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// QUERY
 
-vector<uint32_t> Index::query_kmer_rankselect(const string& kmer) const {
+
+
+
+vector<uint32_t> Index::query_kmer(const string& kmer) const {
     bm::bvector<> bitvector = this->bf;
     bvector_rankselect* rs_idx = this->rs_idx;
     vector<uint32_t> vect_pos = this->vect_pos;
@@ -267,14 +295,14 @@ vector<uint32_t> Index::query_kmer_rankselect(const string& kmer) const {
 
 
 
-vect_occ_read Index::query_sequence_rankselect(const string& sequence) const{
+vect_occ_read Index::query_sequence(const string& sequence) const{
 
     vect_occ_read res;
     unordered_map<uint32_t, uint32_t> tmp_reads;
     bool is_first = true;
     for (long unsigned int i=0; i<=sequence.length()-this->k; i++){
         string kmer = sequence.substr(i, this->k);
-        vector<uint32_t> reads_of_kmer = query_kmer_rankselect(kmer);
+        vector<uint32_t> reads_of_kmer = query_kmer(kmer);
         for (auto& idRead : reads_of_kmer){
             if(tmp_reads.find(idRead) != tmp_reads.end()){
                 tmp_reads[idRead] ++;
@@ -297,8 +325,17 @@ vect_occ_read Index::query_sequence_rankselect(const string& sequence) const{
 
 
 
+void Index::query_sequence_fp(const string& sequence, const string& file_out, uint16_t threshold){
+    vector<uint32_t> kmers = kmers_array(sequence);
+    unordered_map<uint32_t, uint16_t> poss_reads = get_possible_reads_threshold(sequence, threshold);
+    vector<uint32_t> res = verif_fp(poss_reads, kmers, threshold);
+    get_reads(file_out, res);
+}
 
-vect_occ_read Index::query_fasta_rankselect(const string& filename) const{
+
+
+
+vect_occ_read Index::query_fasta(const string& filename) const{
     
     vect_occ_read res;
     unordered_map<uint32_t, uint32_t> tmp_reads;
@@ -310,7 +347,7 @@ vect_occ_read Index::query_fasta_rankselect(const string& filename) const{
         while( !fichier.eof()){
             getline(fichier,ligne);
             if (ligne[0] != '>' && !ligne.empty()){
-                vect_occ_read occ_read = query_sequence_rankselect(ligne);
+                vect_occ_read occ_read = query_sequence(ligne);
                 for (auto& struct_read : occ_read){
                     int read_id = struct_read.read_id;
                     int total_count = struct_read.total_count;
@@ -338,6 +375,14 @@ vect_occ_read Index::query_fasta_rankselect(const string& filename) const{
     }
 }
 
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OTHER
+
+
+
 uint32_t Index::uniqueKmers(){
     vector<uint32_t> vect_pos = this->vect_pos;
     uint32_t nb_unique = 0;
@@ -347,4 +392,114 @@ uint32_t Index::uniqueKmers(){
         }
     }
     return nb_unique;
+}
+
+
+vector<uint32_t> Index::kmers_array(const string& sequence){
+    vector<uint32_t> kmers;
+    string curr_kmer;
+    uint32_t kmer_int;
+    for (long unsigned int i=0; i<=sequence.length()-this->k+1; i++){
+        curr_kmer = sequence.substr(i, this->k);
+        kmer_int = str2numstrand(curr_kmer);
+        kmers.push_back(kmer_int);
+    }
+    sort(kmers.begin(), kmers.end());
+    return kmers;
+}
+
+
+unordered_map<uint32_t, uint16_t> Index::get_possible_reads_threshold(const string& sequence, uint threshold){
+    unordered_map<uint32_t, uint16_t> id_to_count = {};
+
+    string curr_kmer;
+    vector<uint32_t> curr_ids_read;
+    uint i = 0;
+
+    // INSERTION HASHMAP DU NOMBRE D'APPARITION POUR CHAQUE READ
+    for (long unsigned int i=0; i<=sequence.length()-this->k; i++){
+
+        curr_kmer = sequence.substr(i, this->k);
+
+        // INSERTION DANS ARRAY DES KMERS (INT)
+        curr_ids_read = query_kmer(curr_kmer);
+        bool inserted = false;
+        for(auto id_read : curr_ids_read){
+            for (auto i = id_to_count.begin(); i != id_to_count.end(); i++){
+                if(i->first == id_read){
+                    i->second++; // UN MEME READ PEUT ETRE INCRÉMENTÉ PLUSIEURS FOIS POUR LE MEME KMER
+                    inserted = true;
+                }
+            }
+            if(!inserted){
+                id_to_count[id_read] = 1;
+            }
+        }
+    }
+
+    // VERIF SEUIL
+    unordered_map<uint32_t, uint16_t>::iterator it = id_to_count.begin();
+    while (it != id_to_count.end()) {
+        if ((it->second) < threshold) {
+            it = id_to_count.erase(it);
+        } else
+            it++;
+    }
+    return id_to_count;
+}
+
+
+
+vector<uint32_t> Index::verif_fp(const unordered_map<uint32_t, uint16_t>& reads_to_verify, const vector<uint32_t>& kmers, uint16_t threshold){
+
+    string read_seq, curr_kmer;
+    uint32_t kmer_int, revComp_int;
+    uint64_t kmer_hash;
+    vector<uint32_t> reads_to_return = {};
+    for(auto read = reads_to_verify.begin(); read != reads_to_verify.end(); read++){
+        uint cpt = 0;
+        read_seq = get_read_sequence(this->filename, read->first);
+        bool is_first = true;
+        string ligne, kmer;
+        uint i = k;
+        while(i<read_seq.length()){
+            if(is_first){
+                kmer = read_seq.substr(0, k);
+                kmer_int = str2numstrand(kmer);
+                is_first = false;
+            }
+            else{
+                kmer_int = shiftnucl(kmer_int, read_seq[i], k);
+                i++;
+            }
+
+            if (binary_search(kmers.begin(), kmers.end(), kmer_int)) {
+                cpt++;
+            }
+            if(cpt == threshold){
+                reads_to_return.push_back(read->first);
+                break;
+            }
+        }
+
+
+    }
+    return reads_to_return;
+}
+
+
+
+void Index::memory_file(const string& output_file, uint16_t k, uint16_t bv_size){
+  ofstream file(output_file, ios::out);
+  if(file){
+    file << k << ";" << bv_size << endl;
+    file << "K-mers:" << this->nb_kmers << endl;
+    file << "Counting bf:" << this->counting_bf->size() << endl;
+    file << "Position vector:" << this->vect_pos.size() * 4 << endl;
+    file << "Compressed index:" << this->compressed_index.size() << endl;
+    file << endl;
+  }
+  else{
+    cerr << "Error opening the file." << endl;
+  }
 }

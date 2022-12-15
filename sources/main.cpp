@@ -15,6 +15,7 @@
 #include "../TurboPFor-Integer-Compression/vp4.h"
 #include "../SIMDCompressionAndIntersection/include/codecfactory.h"
 #include "../SIMDCompressionAndIntersection/include/intersection.h"
+//#include "../include/unordered_dense.h"
 
 using namespace std;
 using namespace chrono;
@@ -29,6 +30,18 @@ int main(int argc, char *argv[])
 
     else{
 
+        /*string filename(argv[1]);
+        uint16_t k = stoi(argv[2]);
+        uint16_t bitvector_size = stoi(argv[3]);
+        
+        Index index = Index(filename, k);         
+        index.index_compressed(filename, k, bitvector_size);
+
+        string test = "TTTGTCCGTGGAATGAACAATGGAAGTCAAC";
+
+        index.query_sequence_fp(test, "input_files/test_out.fa", 1);*/
+        
+        
         string filename(argv[1]);
         uint16_t k = stoi(argv[2]);
         uint16_t bitvector_size = stoi(argv[3]);
@@ -37,7 +50,7 @@ int main(int argc, char *argv[])
 
         auto start_indexing = high_resolution_clock::now();
                 
-        index.index_fasta_rankselect_compressed(filename, k, bitvector_size);
+        index.index_compressed(filename, k, bitvector_size);
 
         auto end_indexing = high_resolution_clock::now();
         auto indexing = duration_cast<seconds>(end_indexing - start_indexing);
@@ -62,7 +75,7 @@ int main(int argc, char *argv[])
                         // QUERYING KMER
                     string kmer_to_search = seq_from_fasta(optarg);
                     auto start_querying_kmer = high_resolution_clock::now();
-                    vector<uint32_t> res_query_kmer = index.query_kmer_rankselect(kmer_to_search);
+                    vector<uint32_t> res_query_kmer = index.query_kmer(kmer_to_search);
                     if(res_query_kmer.empty()){
                         cout << "The index does not contain this k-mer.";
                     }
@@ -77,7 +90,8 @@ int main(int argc, char *argv[])
                     // QUERYING SEQUENCE
                     string seq = seq_from_fasta(optarg);
                     auto start_querying_seq = high_resolution_clock::now();
-                    index.query_sequence_rankselect(seq);
+                    //index.query_sequence(seq);
+                    index.query_sequence_fp(seq, "input_files/test_out.fa", 1);
                     auto end_querying_seq = high_resolution_clock::now();
                     auto querying_seq = duration_cast<seconds>(end_querying_seq - start_querying_seq);
                     cout << "Querying the sequence takes " << querying_seq.count() << " seconds." << endl;
@@ -89,7 +103,7 @@ int main(int argc, char *argv[])
 
                     // QUERYING FASTA
                     auto start_querying_fasta = high_resolution_clock::now();
-                    index.query_fasta_rankselect(optarg);
+                    index.query_fasta(optarg);
                     auto end_querying_fasta = high_resolution_clock::now();
                     auto querying_fasta = duration_cast<seconds>(end_querying_fasta - start_querying_fasta);
                     cout << "Querying the Fasta file takes " << querying_fasta.count() << " seconds." << endl;

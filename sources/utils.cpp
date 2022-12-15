@@ -9,6 +9,8 @@
 #include "../headers/bloomfilter.h"
 #include "../SIMDCompressionAndIntersection/include/codecfactory.h"
 #include "../SIMDCompressionAndIntersection/include/intersection.h"
+#include "../include/unordered_dense.h"
+
 
 
 
@@ -73,61 +75,28 @@ uint32_t str2numstrand(const string& str) {
 }
 
 
+string num2strstrand(uint32_t integer){
+  string res;
+  uint32_t mask;
+  while(integer != 0){
+    mask = integer & 3;
+    switch (mask){
+      case 0:res="A"+res;break;
+      case 1:res="C"+res;break;
+      case 2:res="G"+res;break;
+      case 3:res="T"+res;break;
+    }
+    integer = integer >> 2;
+  }
+  return res;
+}
 
-// void delta_encoding(const rh_umap& index){
-//   for (auto const &pair: index) {
-//     int N = pair.second.size();
-//     compute_deltas_inplace((uint32_t *) pair.second.data(),N,0);
-//   }
-// }
 
 
 
 void delta_decoding(const vector<uint32_t> reads){
   int N = reads.size();
   compute_prefix_sum_inplace((uint32_t *) reads.data(),N,0);
-}
-
-
-
-// void vector_compression(rh_umap& index){
-//   IntegerCODEC &codec = *CODECFactory::getFromName("s4-bp128-d4");
-//   for (auto &pair: index) {
-//     if(pair.second->size() > 5 or true){
-//        int N = index[pair.first]->size();
-//         vector<uint32_t> compressed_output=vector<uint32_t>(N+8);
-//         size_t compressedsize = compressed_output.size();
-//         codec.encodeArray((uint32_t *) pair.second->data(), N, compressed_output.data(), compressedsize);
-//         delete(index[pair.first]);
-//         compressed_output.resize(compressedsize);
-//         index[pair.first]  = new vector<uint32_t>;
-//         for(uint i(0);i<compressedsize;++i){
-//           (index[pair.first] )->push_back(compressed_output[i]);
-//         }
-//           vector<uint32_t> mydataback(N);
-//           size_t recoveredsize = mydataback.size();
-//           //
-//           codec.decodeArray(compressed_output.data(), compressedsize,
-//                             mydataback.data(), recoveredsize);
-//             if (mydataback != *pair.second)
-//               throw runtime_error("bug!"); 
-//          //*light_vector=compressed_output;
-//          cout << static_cast<double>(compressed_output.size()) << " " << static_cast<double>(pair.second->size()) << endl;
-//          cout<<N<<" "<<index[pair.first] ->size()<<" "<<index[pair.first] ->capacity()<<endl;
-//     }
-//   }
-// }
-
-
-
-
-void vector_decompression(const vector<uint32_t> reads){
-  IntegerCODEC &codec = *CODECFactory::getFromName("s4-bp128-d4");
-  int N = reads.size();
-  vector<uint32_t> mydataback(N);
-  size_t recoveredsize = mydataback.size();
-  codec.decodeArray(reads.data(), N, mydataback.data(), recoveredsize);
-  //mydataback.shrink_to_fit();
 }
 
 
@@ -155,17 +124,6 @@ string intToString(uint64_t num) {
 
 
 
-void write_values(string output_file, float val1, const string& val2){
-  ofstream outp(output_file, ios::app);
-    if (outp){
-        outp << val1 << " " << val2 << endl;
-    }
-  outp.close();
-}
-
-
-
-
 uint32_t revhash(uint32_t x) {
 	x = ((x >> 16) ^ x) * 0x2c1b3c6d;
 	x = ((x >> 16) ^ x) * 0x297a2d39;
@@ -177,7 +135,7 @@ uint32_t revhash(uint32_t x) {
 
 
 uint32_t unrevhash(uint32_t x) {
-	x = ((x >> 16) ^ x) * 0x0cf0b109; // PowerMod[0x297a2d39, -1, 2^32]
+	x = ((x >> 16) ^ x) * 0x0cf0b109;
 	x = ((x >> 16) ^ x) * 0x64ea2d65;
 	x = ((x >> 16) ^ x);
 	return x;
@@ -244,46 +202,88 @@ uint64_t find_canonical(uint64_t kmer_int, uint64_t revComp_int, uint64_t bitvec
 
 
 
-void transform_file(const string& fich1, const string& fich2){
-  
-  ifstream fichier1(fich1, ios::in);
-  ofstream outp(fich2);
-  if(outp){
-    string ligne;
-    while(!fichier1.eof()){
-      getline(fichier1,ligne);
-      ligne.erase(0, ligne.find(":")+1);
-      ligne.erase(std::remove_if(ligne.begin(), ligne.end(), ::isspace), ligne.end());
-      outp << ligne << "\n";
+vector<uint32_t> read_line_position(const string& filename){
+  vector<uint32_t> read_line_position={0};
+  fstream file(filename, ios::in);
+  if(file){
+    string line;
+    uint32_t total_count = 0;
+    while(!file.eof()){
+      getline(file, line);
+      total_count += line.length();
+      read_line_position.push_back(total_count+1);
     }
+    return read_line_position;
   }
-  fichier1.close();
-  outp.close();
+  else{
+    cerr << "Error opening the file." << endl;
+  }
 }
 
 
 
-string compare_files(const string& file1, const string& file2){
-  string res = "";
-  int cpt = 1;
-  ifstream fichier1(file1, ios::in);
-  ifstream fichier2(file2, ios::in);
+string get_read_sequence(const string& filename, uint32_t read_id){
+  vector<uint32_t> read_line_length = read_line_position(filename);
+  auto pos_seq = read_line_length[(read_id*2)+1];
+  auto pos_entete_suivant = read_line_length[(read_id*2)+2];
 
-  if(fichier1 && fichier2){
-    string ligne1, ligne2;
-    while(!fichier1.eof() && !fichier2.eof()){
-      getline(fichier1,ligne1);
-      getline(fichier2,ligne2);
+  fstream file_in(filename, ios::in);
+  char line_seq[100];
+    if(file_in){
+      file_in.seekg((pos_seq+read_id*2), file_in.beg);
+      file_in.read(line_seq, ((pos_entete_suivant+read_id)-(pos_seq+read_id)));
+      line_seq[((pos_entete_suivant+read_id*2)-(pos_seq+read_id))] = 0;
 
-      if(ligne1 != ligne2){
-        res += std::to_string(cpt);
-        res += " ";
-      }
-      cpt++;
+      return line_seq;
     }
-  }
-  return res;
+    else{
+      cerr << "Error opening the output file." << endl;
+    }
 }
 
+
+void Index::get_reads(const string& read_file_out, const vector<uint32_t>& id_reads){
+    vector<uint32_t> read_line_length = read_line_position(this->filename);
+    fstream file_in(this->filename, ios::in);
+    if(file_in){
+        fstream file_out(read_file_out, ios::out);
+        if(file_out){
+            for(uint32_t id_read : id_reads){
+                char line_entete[100]; // ICI VOIR POUR LA LONGUEUR
+                char line_seq[100];
+                auto pos_entete = read_line_length[(id_read*2)];
+                auto pos_seq = read_line_length[(id_read*2)+1];
+                auto pos_entete_suivant = read_line_length[(id_read*2)+2];
+
+                // HEADER
+
+                if(pos_entete == 0){
+                  file_in.seekg(pos_entete+id_read, file_in.beg);
+                  file_in.read(line_entete, ((pos_seq+(2*id_read-1))-pos_entete));
+                  line_entete[(pos_seq+id_read)-(pos_entete+1)] = 0;
+                }
+                else{
+                  file_in.seekg(pos_entete+(2*id_read-1), file_in.beg);
+                  file_in.read(line_entete, ((pos_seq+(2*id_read-1))-(pos_entete+(2*id_read-1)-1)));
+                  line_entete[(pos_seq+(2*id_read-1))-(pos_entete+(2*id_read-1))] = 0;
+                }
+                file_out << line_entete << endl;
+
+                // SEQUENCE
+
+                file_in.seekg((pos_seq+id_read*2), file_in.beg);
+                file_in.read(line_seq, ((pos_entete_suivant+id_read)-(pos_seq+id_read)));
+                line_seq[((pos_entete_suivant+id_read*2)-(pos_seq+id_read))] = 0;
+                file_out << line_seq << endl;
+            }
+        }
+        else{
+            cerr << "Error opening the output file." << endl;
+        }
+    }
+    else{
+        cerr << "Error opening the input file." << endl;
+    }
+}
 
 
