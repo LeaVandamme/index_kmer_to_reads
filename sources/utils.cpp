@@ -9,8 +9,6 @@
 #include "../headers/bloomfilter.h"
 #include "../SIMDCompressionAndIntersection/include/codecfactory.h"
 #include "../SIMDCompressionAndIntersection/include/intersection.h"
-#include "../include/unordered_dense.h"
-
 
 
 
@@ -203,7 +201,7 @@ uint64_t find_canonical(uint64_t kmer_int, uint64_t revComp_int, uint64_t bitvec
 
 
 vector<uint32_t> read_line_position(const string& filename){
-  vector<uint32_t> read_line_position={0};
+  vector<uint32_t> read_line_pos={0};
   fstream file(filename, ios::in);
   if(file){
     string line;
@@ -211,79 +209,76 @@ vector<uint32_t> read_line_position(const string& filename){
     while(!file.eof()){
       getline(file, line);
       total_count += line.length();
-      read_line_position.push_back(total_count+1);
+      read_line_pos.push_back(total_count+1);
     }
-    return read_line_position;
+    return read_line_pos;
   }
   else{
-    cerr << "Error opening the file." << endl;
+    cerr << "Error opening the file (read_line_position)." << endl;
   }
 }
 
 
-
-string get_read_sequence(const string& filename, uint32_t read_id){
-  vector<uint32_t> read_line_length = read_line_position(filename);
-  auto pos_seq = read_line_length[(read_id*2)+1];
-  auto pos_entete_suivant = read_line_length[(read_id*2)+2];
+string get_read_sequence(const vector<uint32_t>& read_line_pos, const string& filename, uint32_t read_id){
+  auto pos_seq = read_line_pos[(read_id*2)+1];
+  auto pos_entete_suivant = read_line_pos[(read_id*2)+2];
 
   fstream file_in(filename, ios::in);
-  char line_seq[100];
+  char line_seq[100000];
     if(file_in){
       file_in.seekg((pos_seq+read_id*2), file_in.beg);
       file_in.read(line_seq, ((pos_entete_suivant+read_id)-(pos_seq+read_id)));
       line_seq[((pos_entete_suivant+read_id*2)-(pos_seq+read_id))] = 0;
 
+      file_in.close();
       return line_seq;
     }
     else{
-      cerr << "Error opening the output file." << endl;
+      cerr << "Error opening the input file (get_read_sequence)." << endl;
     }
 }
 
 
-void Index::get_reads(const string& read_file_out, const vector<uint32_t>& id_reads){
-    vector<uint32_t> read_line_length = read_line_position(this->filename);
-    fstream file_in(this->filename, ios::in);
+void get_reads(const string& filename, const vector<uint32_t>& read_line_pos, const string& read_file_out, const vector<uint32_t>& id_reads){
+    fstream file_in(filename, ios::in);
     if(file_in){
         fstream file_out(read_file_out, ios::out);
         if(file_out){
             for(uint32_t id_read : id_reads){
-                char line_entete[100]; // ICI VOIR POUR LA LONGUEUR
-                char line_seq[100];
-                auto pos_entete = read_line_length[(id_read*2)];
-                auto pos_seq = read_line_length[(id_read*2)+1];
-                auto pos_entete_suivant = read_line_length[(id_read*2)+2];
+                char line_entete[100000]; // ICI VOIR POUR LA LONGUEUR
+                char line_seq[100000];
+                auto pos_entete = read_line_pos[(id_read*2)];
+                auto pos_seq = read_line_pos[(id_read*2)+1];
+                auto pos_entete_suivant = read_line_pos[(id_read*2)+2];
+
+                uint16_t header_length = pos_seq-pos_entete;
 
                 // HEADER
 
                 if(pos_entete == 0){
-                  file_in.seekg(pos_entete+id_read, file_in.beg);
-                  file_in.read(line_entete, ((pos_seq+(2*id_read-1))-pos_entete));
-                  line_entete[(pos_seq+id_read)-(pos_entete+1)] = 0;
+                  file_in.seekg(pos_entete, file_in.beg);
+                  file_in.read(line_entete, header_length);
+                  line_entete[pos_seq-(pos_entete+1)] = 0;
                 }
                 else{
                   file_in.seekg(pos_entete+(2*id_read-1), file_in.beg);
-                  file_in.read(line_entete, ((pos_seq+(2*id_read-1))-(pos_entete+(2*id_read-1)-1)));
-                  line_entete[(pos_seq+(2*id_read-1))-(pos_entete+(2*id_read-1))] = 0;
+                  file_in.read(line_entete, (header_length)+1);
+                  line_entete[header_length] = 0;
                 }
                 file_out << line_entete << endl;
 
                 // SEQUENCE
 
-                file_in.seekg((pos_seq+id_read*2), file_in.beg);
-                file_in.read(line_seq, ((pos_entete_suivant+id_read)-(pos_seq+id_read)));
-                line_seq[((pos_entete_suivant+id_read*2)-(pos_seq+id_read))] = 0;
+                file_in.tellg();
+                file_in.read(line_seq, pos_entete_suivant-pos_seq);
                 file_out << line_seq << endl;
             }
         }
         else{
-            cerr << "Error opening the output file." << endl;
+            cerr << "Error opening the output file (get_reads)." << endl;
         }
     }
     else{
-        cerr << "Error opening the input file." << endl;
+        cerr << "Error opening the input file (get_reads)." << endl;
     }
 }
-
-

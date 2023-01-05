@@ -15,7 +15,6 @@
 #include "../TurboPFor-Integer-Compression/vp4.h"
 #include "../SIMDCompressionAndIntersection/include/codecfactory.h"
 #include "../SIMDCompressionAndIntersection/include/intersection.h"
-//#include "../include/unordered_dense.h"
 
 using namespace std;
 using namespace chrono;
@@ -23,7 +22,7 @@ using namespace SIMDCompressionLib;
 
 int main(int argc, char *argv[])
 {
-    if (argc > 9 || argc < 2){
+    if (argc > 11 || argc < 2){
 		cout << "[Fasta file (reads)] [Kmer length] [Bitvector Size] -k [Fasta file (1 kmer)] -s [Fasta file (1 sequence)] -f [Fasta file (several sequences)]" <<endl;
 		exit(0);
     }
@@ -41,16 +40,17 @@ int main(int argc, char *argv[])
 
         index.query_sequence_fp(test, "input_files/test_out.fa", 1);*/
         
-        
         string filename(argv[1]);
         uint16_t k = stoi(argv[2]);
         uint16_t bitvector_size = stoi(argv[3]);
+        string output_file(argv[4]);
+        string memory_file(argv[5]);
         
         Index index = Index(filename, k);
 
         auto start_indexing = high_resolution_clock::now();
                 
-        index.index_compressed(filename, k, bitvector_size);
+        index.index_compressed(filename, k, bitvector_size, memory_file);
 
         auto end_indexing = high_resolution_clock::now();
         auto indexing = duration_cast<seconds>(end_indexing - start_indexing);
@@ -90,8 +90,7 @@ int main(int argc, char *argv[])
                     // QUERYING SEQUENCE
                     string seq = seq_from_fasta(optarg);
                     auto start_querying_seq = high_resolution_clock::now();
-                    //index.query_sequence(seq);
-                    index.query_sequence_fp(seq, "input_files/test_out.fa", 1);
+                    index.query_sequence_fp(seq, output_file, 1);
                     auto end_querying_seq = high_resolution_clock::now();
                     auto querying_seq = duration_cast<seconds>(end_querying_seq - start_querying_seq);
                     cout << "Querying the sequence takes " << querying_seq.count() << " seconds." << endl;

@@ -15,7 +15,6 @@
 #include "../headers/utils.h"
 #include "../include/robin_hood.h"
 #include "../TurboPFor-Integer-Compression/vp4.h"
-//#include "../include/unordered_dense.h"
 
 
 
@@ -48,6 +47,9 @@ void Index::set_rs_idx(bvector_rankselect* rs_idx){
 void Index::set_vect_pos(vector<uint32_t>& vect_pos){
     this-> vect_pos = vect_pos;
 }
+void Index::set_read_line_pos(const vector<uint32_t>& read_line_pos){
+    this-> read_line_pos = read_line_pos;
+}
 
 
 
@@ -56,7 +58,7 @@ void Index::set_vect_pos(vector<uint32_t>& vect_pos){
 
 
 
-void Index::index_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size){
+void Index::index_compressed(const string& read_file, uint16_t k, uint16_t bitvector_size, const string& memory_output){
     bm::bvector<> bitvector;
     bm::bvector<>::rs_index_type* rs_idx(new bm::bvector<>::rs_index_type());
 
@@ -74,12 +76,12 @@ void Index::index_compressed(const string& read_file, uint16_t k, uint16_t bitve
     ifstream fichier(read_file, ios::in);
     if(fichier){
 
-        vector<uint32_t> tmp_vect_kmers;
+        vector<uint32_t> tmp_vect_kmers; // BITVECTOR
 
         // BLOOM FILTER
         
         while(!fichier.eof()){
-            string ligne, kmer;
+            string ligne, kmer; 
             getline(fichier,ligne);
             bool is_first = true;
             if (ligne[0] != '>' && !ligne.empty()){
@@ -242,8 +244,10 @@ void Index::index_compressed(const string& read_file, uint16_t k, uint16_t bitve
     this->set_vect_pos(vect_pos);
     this->set_rs_idx(rs_idx);
     this->set_bf(bitvector);
+    vector<uint32_t> read_line_pos = read_line_position(read_file);
+    this->set_read_line_pos(read_line_pos);
 
-    memory_file("input_files/test_out_memory.txt", k, bitvector_size);
+    memory_file(memory_output, k, bitvector_size, read_ids.size()*4);
 }
 
 
@@ -329,7 +333,7 @@ void Index::query_sequence_fp(const string& sequence, const string& file_out, ui
     vector<uint32_t> kmers = kmers_array(sequence);
     unordered_map<uint32_t, uint16_t> poss_reads = get_possible_reads_threshold(sequence, threshold);
     vector<uint32_t> res = verif_fp(poss_reads, kmers, threshold);
-    get_reads(file_out, res);
+    get_reads(filename, read_line_pos, file_out, res);
 }
 
 
@@ -370,7 +374,7 @@ vect_occ_read Index::query_fasta(const string& filename) const{
         return res;
     }
     else{
-        cerr << "Error opening the file." << endl;
+        cerr << "Error opening the file (query_fasta)." << endl;
         return res;
     }
 }
@@ -395,7 +399,7 @@ uint32_t Index::uniqueKmers(){
 }
 
 
-vector<uint32_t> Index::kmers_array(const string& sequence){
+vector<uint32_t> Index::kmers_array(const string& sequence) const{
     vector<uint32_t> kmers;
     string curr_kmer;
     uint32_t kmer_int;
@@ -409,7 +413,7 @@ vector<uint32_t> Index::kmers_array(const string& sequence){
 }
 
 
-unordered_map<uint32_t, uint16_t> Index::get_possible_reads_threshold(const string& sequence, uint threshold){
+unordered_map<uint32_t, uint16_t> Index::get_possible_reads_threshold(const string& sequence, uint threshold) const{
     unordered_map<uint32_t, uint16_t> id_to_count = {};
 
     string curr_kmer;
@@ -423,16 +427,17 @@ unordered_map<uint32_t, uint16_t> Index::get_possible_reads_threshold(const stri
 
         // INSERTION DANS ARRAY DES KMERS (INT)
         curr_ids_read = query_kmer(curr_kmer);
-        bool inserted = false;
+        
         for(auto id_read : curr_ids_read){
-            for (auto i = id_to_count.begin(); i != id_to_count.end(); i++){
-                if(i->first == id_read){
-                    i->second++; // UN MEME READ PEUT ETRE INCRÉMENTÉ PLUSIEURS FOIS POUR LE MEME KMER
-                    inserted = true;
-                }
-            }
-            if(!inserted){
+            if(id_to_count.find(id_read) == id_to_count.end()){
                 id_to_count[id_read] = 1;
+            }
+            else{
+                for (auto i = id_to_count.begin(); i != id_to_count.end(); i++){
+                    if(i->first == id_read){
+                        i->second++; // UN MEME READ PEUT ETRE INCRÉMENTÉ PLUSIEURS FOIS POUR LE MEME KMER
+                    }
+                }
             }
         }
     }
@@ -450,7 +455,7 @@ unordered_map<uint32_t, uint16_t> Index::get_possible_reads_threshold(const stri
 
 
 
-vector<uint32_t> Index::verif_fp(const unordered_map<uint32_t, uint16_t>& reads_to_verify, const vector<uint32_t>& kmers, uint16_t threshold){
+vector<uint32_t> Index::verif_fp(const unordered_map<uint32_t, uint16_t>& reads_to_verify, const vector<uint32_t>& kmers, uint16_t threshold) const{
 
     string read_seq, curr_kmer;
     uint32_t kmer_int, revComp_int;
@@ -458,7 +463,7 @@ vector<uint32_t> Index::verif_fp(const unordered_map<uint32_t, uint16_t>& reads_
     vector<uint32_t> reads_to_return = {};
     for(auto read = reads_to_verify.begin(); read != reads_to_verify.end(); read++){
         uint cpt = 0;
-        read_seq = get_read_sequence(this->filename, read->first);
+        read_seq = get_read_sequence(read_line_pos, filename, read->first);
         bool is_first = true;
         string ligne, kmer;
         uint i = k;
@@ -481,25 +486,26 @@ vector<uint32_t> Index::verif_fp(const unordered_map<uint32_t, uint16_t>& reads_
                 break;
             }
         }
-
-
     }
     return reads_to_return;
 }
 
 
 
-void Index::memory_file(const string& output_file, uint16_t k, uint16_t bv_size){
-  ofstream file(output_file, ios::out);
+void Index::memory_file(const string& output_file, uint16_t k, uint16_t bv_size, size_t uncomp_index_size) const{
+  ofstream file(output_file, ios::out | ios_base::app);
+  bm::bvector<>::statistics st;
+  this->bf.calc_stat(&st);
   if(file){
     file << k << ";" << bv_size << endl;
     file << "K-mers:" << this->nb_kmers << endl;
+    file << "Bf:" << st.memory_used << endl;
     file << "Counting bf:" << this->counting_bf->size() << endl;
     file << "Position vector:" << this->vect_pos.size() * 4 << endl;
+    file << "Uncompressed index:" << uncomp_index_size << endl;
     file << "Compressed index:" << this->compressed_index.size() << endl;
-    file << endl;
   }
   else{
-    cerr << "Error opening the file." << endl;
+    cerr << "Error opening the file (memory_file)." << endl;
   }
 }

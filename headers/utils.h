@@ -30,8 +30,7 @@ uint64_t find_canonical(uint64_t kmer_int, uint64_t revComp_int, uint64_t bitvec
 uint64_t modulo(uint64_t nb, uint32_t m);
 
 vector<uint32_t> read_line_position(const string& filename);
-string get_read_sequence(const string& filename, uint32_t read_id);
-void get_reads(const string& read_file_out, const vector<uint32_t>& id_reads);
-
+string get_read_sequence(const vector<uint32_t>& read_line_pos, const string& filename, uint32_t read_id);
+void get_reads(const string& filename, const vector<uint32_t>& read_line_pos, const string& read_file_out, const vector<uint32_t>& id_reads);
 
 #endif
